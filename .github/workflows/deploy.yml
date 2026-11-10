@@ -78,6 +78,8 @@ jobs:
             echo "::notice::El tag $version ya existe; no se recrea."
             exit 0
           fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag -a "$version" -m "Release $version"
           git push origin "$version"
           echo "::notice::Creado el tag $version"
