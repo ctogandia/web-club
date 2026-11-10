@@ -1,0 +1,99 @@
+name: Desplegar
+
+# release/rc-*  → pruebas.ctogandia.com   (automático)
+# develop        → pruebas.ctogandia.com   (a demanda, con "Run workflow")
+# main           → ctogandia.com           (requiere aprobación en el environment "production")
+#
+# Flujo: develop → release/rc-vX.Y.Z → PR a main → merge. El merge a main publica en
+# producción tras tu aprobación y, si todo va bien, crea el tag vX.Y.Z (leído del nombre
+# de la rama de release) para poder volver atrás y documentar la versión.
+# Pruebas tiene su propia base de datos (independiente de producción), así que
+# desplegar ahí no afecta a los datos de producción.
+on:
+  push:
+    branches: [develop, main, 'release/rc-*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:   # desplegar pruebas a demanda desde la rama que elijas (p. ej. develop)
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Comprobar PHP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: none
+
+      - name: php -l
+        run: find wp-content -name '*.php' -print0 | xargs -0 -n1 php -l
+
+  pruebas:
+    name: Desplegar en pruebas
+    needs: lint
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/rc-')) ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://pruebas.ctogandia.com
+    concurrency: deploy-staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/sftp-deploy
+        with:
+          host: ${{ secrets.SFTP_HOST }}
+          user: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          remote-path: ${{ vars.REMOTE_PATH }}
+
+  produccion:
+    name: Desplegar en producción
+    needs: lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # para crear el tag de la versión tras desplegar
+    environment:
+      name: production
+      url: https://ctogandia.com
+    concurrency: deploy-production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/sftp-deploy
+        with:
+          host: ${{ secrets.SFTP_HOST }}
+          user: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASSWORD }}
+          known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          remote-path: ${{ vars.REMOTE_PATH }}
+
+      - name: Tag de la versión
+        run: |
+          # La versión sale del nombre de la rama de release en el commit de merge
+          # ("Merge pull request #N from ctogandia/release/rc-vX.Y.Z"). Requiere que
+          # los PR a main se integren con un merge commit (no squash). Si no se
+          # encuentra, no se falla: simplemente no se crea tag.
+          version="$(git log -1 --pretty=%B | grep -oiE 'release/rc-v[0-9]+\.[0-9]+\.[0-9]+' | head -1 | grep -oiE 'v[0-9]+\.[0-9]+\.[0-9]+')"
+          if [ -z "$version" ]; then
+            echo "::warning::No encuentro release/rc-vX.Y.Z en el commit de merge; no se crea tag."
+            exit 0
+          fi
+          if git rev-parse "refs/tags/$version" >/dev/null 2>&1; then
+            echo "::notice::El tag $version ya existe; no se recrea."
+            exit 0
+          fi
+          git tag -a "$version" -m "Release $version"
+          git push origin "$version"
+          echo "::notice::Creado el tag $version"
