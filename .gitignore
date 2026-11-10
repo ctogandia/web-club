@@ -1,0 +1,20 @@
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Editores
+.idea/
+.vscode/
+*.swp
+
+# Nunca al repo
+wp-config.php
+.htpasswd
+*.sql
+*.sql.gz
+.env
+.env.*
+
+# Dependencias / builds
+node_modules/
+vendor/
