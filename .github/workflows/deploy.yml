@@ -5,8 +5,8 @@ name: Desplegar
 # main           → ctogandia.com           (requiere aprobación en el environment "production")
 #
 # Flujo: develop → release/rc-vX.Y.Z → PR a main → merge. El merge a main publica en
-# producción tras tu aprobación y, si todo va bien, crea el tag vX.Y.Z (leído del nombre
-# de la rama de release) para poder volver atrás y documentar la versión.
+# producción tras tu aprobación y, si todo va bien, crea el release vX.Y.Z en GitHub
+# (tag + changelog automático, leído del nombre de la rama de release).
 # Pruebas tiene su propia base de datos (independiente de producción), así que
 # desplegar ahí no afecta a los datos de producción.
 on:
@@ -63,23 +63,27 @@ jobs:
           known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
           remote-path: ${{ vars.REMOTE_PATH }}
 
-      - name: Tag de la versión
+      - name: Crear release en GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           # La versión sale del nombre de la rama de release en el commit de merge
           # ("Merge pull request #N from ctogandia/release/rc-vX.Y.Z"). Requiere que
           # los PR a main se integren con un merge commit (no squash). Si no se
-          # encuentra, no se falla: simplemente no se crea tag.
+          # encuentra, no se falla: simplemente no se crea el release.
           version="$(git log -1 --pretty=%B | grep -oiE 'release/rc-v[0-9]+\.[0-9]+\.[0-9]+' | head -1 | grep -oiE 'v[0-9]+\.[0-9]+\.[0-9]+')"
           if [ -z "$version" ]; then
-            echo "::warning::No encuentro release/rc-vX.Y.Z en el commit de merge; no se crea tag."
+            echo "::warning::No encuentro release/rc-vX.Y.Z en el commit de merge; no se crea el release."
             exit 0
           fi
-          if git rev-parse "refs/tags/$version" >/dev/null 2>&1; then
-            echo "::notice::El tag $version ya existe; no se recrea."
+          if gh release view "$version" >/dev/null 2>&1; then
+            echo "::notice::El release $version ya existe; no se recrea."
             exit 0
           fi
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "$version" -m "Release $version"
-          git push origin "$version"
-          echo "::notice::Creado el tag $version"
+          # Crea el tag (sobre este commit de main) y el release con el changelog
+          # generado automáticamente a partir de los PRs desde el release anterior.
+          gh release create "$version" \
+            --target "$GITHUB_SHA" \
+            --title "$version" \
+            --generate-notes
+          echo "::notice::Creado el release $version"

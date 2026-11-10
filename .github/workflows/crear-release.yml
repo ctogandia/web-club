@@ -107,6 +107,6 @@ jobs:
             --body "Rama de release candidate generada automáticamente (bump: **${TIPO}**) desde \`develop\`.
 
           - **Pruebas:** se despliega sola al crear esta rama → https://pruebas.ctogandia.com
-          - **Producción:** al mergear este PR a \`main\` **con merge commit** (no squash) se publica en producción tras aprobación y se crea el tag \`${VERSION}\`.
+          - **Producción:** al mergear este PR a \`main\` **con merge commit** (no squash) se publica en producción tras aprobación y se crea el release \`${VERSION}\` en GitHub (con changelog automático).
 
           Revisa en pruebas antes de aprobar. Checklist en \`RELEASE.md\`."
