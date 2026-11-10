@@ -1,0 +1,109 @@
+name: Crear rama de release
+
+# Lanzamiento manual. Calcula la siguiente versión a partir de los tags vX.Y.Z y de
+# las ramas release/rc-vX.Y.Z existentes, crea la rama release/rc-v<nueva> desde
+# develop y abre un PR a main.
+#
+# El push de la rama dispara por sí solo el despliegue en pruebas y el check php -l
+# (ver deploy.yml), así que el PR llega con pruebas desplegadas y el check en marcha.
+on:
+  workflow_dispatch:
+    inputs:
+      tipo:
+        description: 'Qué parte de la versión subir'
+        type: choice
+        required: true
+        default: patch
+        options:
+          - major
+          - minor
+          - patch
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency: crear-release
+
+jobs:
+  crear-release:
+    name: Crear rama de release y PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0   # necesitamos todo el historial, tags y ramas
+
+      - name: Calcular la siguiente versión
+        id: version
+        env:
+          TIPO: ${{ inputs.tipo }}
+        run: |
+          set -euo pipefail
+
+          # Traer tags y ramas de release del remoto.
+          git fetch --tags --quiet origin
+          git fetch --quiet origin '+refs/heads/release/rc-*:refs/remotes/origin/release/rc-*' || true
+
+          # Versiones de los tags vX.Y.Z y de las ramas release/rc-vX.Y.Z, sin la 'v'.
+          versiones="$(
+            {
+              git tag -l 'v[0-9]*.[0-9]*.[0-9]*'
+              git branch -r --list 'origin/release/rc-v[0-9]*.[0-9]*.[0-9]*' | sed 's#.*/release/rc-##'
+            } | grep -oiE 'v?[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^[vV]//'
+          )"
+
+          # La más alta (orden numérico por componente). Si no hay ninguna, parte de 0.0.0.
+          ultima="$(printf '%s\n' $versiones | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)"
+          ultima="${ultima:-0.0.0}"
+          IFS=. read -r MA MI PA <<< "$ultima"
+
+          case "$TIPO" in
+            major) MA=$((MA + 1)); MI=0; PA=0 ;;
+            minor) MI=$((MI + 1)); PA=0 ;;
+            patch) PA=$((PA + 1)) ;;
+            *) echo "::error::Tipo no válido: $TIPO"; exit 1 ;;
+          esac
+
+          nueva="v${MA}.${MI}.${PA}"
+          rama="release/rc-${nueva}"
+
+          # No pisar una rama ni un tag que ya existan.
+          if git show-ref --verify --quiet "refs/remotes/origin/${rama}"; then
+            echo "::error::La rama ${rama} ya existe en el remoto."; exit 1
+          fi
+          if git show-ref --tags --verify --quiet "refs/tags/${nueva}"; then
+            echo "::error::El tag ${nueva} ya existe."; exit 1
+          fi
+
+          echo "Última versión: ${ultima} → nueva (${TIPO}): ${nueva}"
+          echo "version=${nueva}" >> "$GITHUB_OUTPUT"
+          echo "rama=${rama}"     >> "$GITHUB_OUTPUT"
+
+      - name: Crear la rama desde develop
+        env:
+          RAMA: ${{ steps.version.outputs.rama }}
+        run: |
+          set -euo pipefail
+          git switch -c "$RAMA" origin/develop
+          git push origin "$RAMA"
+
+      - name: Abrir PR a main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RAMA: ${{ steps.version.outputs.rama }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TIPO: ${{ inputs.tipo }}
+        run: |
+          set -euo pipefail
+          gh pr create \
+            --base main \
+            --head "$RAMA" \
+            --title "Release ${VERSION}" \
+            --body "Rama de release candidate generada automáticamente (bump: **${TIPO}**) desde \`develop\`.
+
+          - **Pruebas:** se despliega sola al crear esta rama → https://pruebas.ctogandia.com
+          - **Producción:** al mergear este PR a \`main\` **con merge commit** (no squash) se publica en producción tras aprobación y se crea el tag \`${VERSION}\`.
+
+          Revisa en pruebas antes de aprobar. Checklist en \`RELEASE.md\`."
