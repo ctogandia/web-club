@@ -48,11 +48,13 @@ jobs:
           git fetch --quiet origin '+refs/heads/release/rc-*:refs/remotes/origin/release/rc-*' || true
 
           # Versiones de los tags vX.Y.Z y de las ramas release/rc-vX.Y.Z, sin la 'v'.
+          # El `|| true` final es imprescindible: en el primer release no hay tags ni
+          # ramas, grep no encuentra nada y devuelve 1, lo que con `pipefail` abortaría.
           versiones="$(
             {
               git tag -l 'v[0-9]*.[0-9]*.[0-9]*'
               git branch -r --list 'origin/release/rc-v[0-9]*.[0-9]*.[0-9]*' | sed 's#.*/release/rc-##'
-            } | grep -oiE 'v?[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^[vV]//'
+            } | grep -oiE 'v?[0-9]+\.[0-9]+\.[0-9]+' | sed 's/^[vV]//' || true
           )"
 
           # La más alta (orden numérico por componente). Si no hay ninguna, parte de 0.0.0.
