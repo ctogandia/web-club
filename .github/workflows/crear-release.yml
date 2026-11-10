@@ -14,7 +14,7 @@ on:
         description: 'Qué parte de la versión subir'
         type: choice
         required: true
-        default: patch
+        default: minor
         options:
           - major
           - minor
