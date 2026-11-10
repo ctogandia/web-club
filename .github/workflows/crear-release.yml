@@ -4,8 +4,9 @@ name: Crear rama de release
 # las ramas release/rc-vX.Y.Z existentes, crea la rama release/rc-v<nueva> desde
 # develop y abre un PR a main.
 #
-# El push de la rama dispara por sí solo el despliegue en pruebas y el check php -l
-# (ver deploy.yml), así que el PR llega con pruebas desplegadas y el check en marcha.
+# El push de la rama dispara por sí solo el despliegue en pruebas (deploy.yml) y el
+# check Comprobar PHP (lint.yml), así que el PR llega con pruebas desplegadas y el
+# check corriendo sobre el mismo commit.
 on:
   workflow_dispatch:
     inputs:
