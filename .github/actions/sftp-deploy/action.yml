@@ -1,0 +1,41 @@
+name: Desplegar por SFTP
+description: Instala lftp, registra la huella del servidor y ejecuta scripts/deploy.sh
+
+inputs:
+  host:
+    required: true
+  user:
+    required: true
+  password:
+    required: true
+  known-hosts:
+    description: Salida de ssh-keyscan del servidor SFTP
+    required: true
+  remote-path:
+    description: '"pruebas" o "www"'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Instalar lftp
+      shell: bash
+      run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+    - name: Huella del servidor
+      shell: bash
+      env:
+        KNOWN_HOSTS: ${{ inputs.known-hosts }}
+      run: |
+        install -d -m 700 ~/.ssh
+        printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+        chmod 600 ~/.ssh/known_hosts
+
+    - name: Desplegar en ${{ inputs.remote-path }}
+      shell: bash
+      env:
+        SFTP_HOST: ${{ inputs.host }}
+        SFTP_USER: ${{ inputs.user }}
+        SFTP_PASSWORD: ${{ inputs.password }}
+        REMOTE_PATH: ${{ inputs.remote-path }}
+      run: bash scripts/deploy.sh
