@@ -1,0 +1,28 @@
+name: Lint
+
+# Comprueba la sintaxis de todos los .php con `php -l` (lo mismo que pide la CI).
+# Corre en los PR a main (para poder marcarlo como check obligatorio) y en los push
+# a las ramas de trabajo.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [develop, main, 'release/rc-*']
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    name: Comprobar PHP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: none
+
+      - name: php -l
+        run: find wp-content -name '*.php' -print0 | xargs -0 -n1 php -l

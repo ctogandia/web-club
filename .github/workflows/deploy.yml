@@ -20,23 +20,8 @@ permissions:
   contents: read
 
 jobs:
-  lint:
-    name: Comprobar PHP
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          tools: none
-
-      - name: php -l
-        run: find wp-content -name '*.php' -print0 | xargs -0 -n1 php -l
-
   pruebas:
     name: Desplegar en pruebas
-    needs: lint
     if: >-
       (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/rc-')) ||
       github.event_name == 'workflow_dispatch'
@@ -57,7 +42,6 @@ jobs:
 
   produccion:
     name: Desplegar en producción
-    needs: lint
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
