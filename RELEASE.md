@@ -32,9 +32,9 @@ develop ──(Run workflow)──────────► pruebas    (a dema
 3. [ ] Prueba en pruebas: la versión móvil y lo que haya cambiado.
 4. [ ] Abre un PR de `release/rc-v0.X.Y` → `main`. Espera a que el check **Comprobar PHP** pase.
 5. [ ] Haz una copia de seguridad de producción con UpdraftPlus **antes** de aprobar.
-6. [ ] Mergea el PR **con merge commit** (no *squash*, para que el nombre de la rama quede en el commit y el tag se cree solo).
+6. [ ] Mergea el PR **con merge commit** (no *squash*, para que el nombre de la rama quede en el commit y el release se cree solo).
 7. [ ] En *Actions → Desplegar → Review deployments*, aprueba **production**.
-8. [ ] Comprueba que se ha creado el tag `v0.X.Y` (lo hace el workflow tras desplegar).
+8. [ ] Comprueba que se ha creado el **release `v0.X.Y`** en GitHub (pestaña *Releases*), con su changelog automático. Lo hace el workflow tras desplegar.
 9. [ ] Aplica a mano los cambios de configuración de la sección de esta versión (abajo).
 10. [ ] Revisa la web y los logs de OVH (*Estadísticas y logs*).
 11. [ ] Si has cambiado algo en el servidor a mano, apúntalo en el `CHANGELOG.md` de la raíz del servidor.
@@ -78,6 +78,11 @@ Lo mismo vale para `mu-plugins/ctogandia`.
 ## Cambios de configuración manuales por versión
 
 Apunta aquí lo que hay que hacer a mano en producción al publicar cada versión: ajustes del panel, importar un JSON de configuración, activar un plugin…
+
+### v0.2.0
+- **Requiere el tema Kadence (padre) instalado.** Instálalo desde *Apariencia → Temas → Añadir nuevo* (wordpress.org) **antes** de activar el hijo; sin el padre, el tema hijo aparece como roto y no se puede activar.
+- Activa el tema **Kadence Child – CTO Gandia** en *Apariencia → Temas*.
+- Hazlo primero en pruebas y, al publicar, también en producción.
 
 ### v0.1.0
 - Nada. Solo instala los mu-plugins de entorno.
