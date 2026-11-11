@@ -1,0 +1,64 @@
+name: Sincronizar main → develop
+
+# Tras cada publicación (merge a main), lleva main de vuelta a develop con una rama
+# chore/sync-main-to-develop-<timestamp> y un PR que se auto-mergea. Así develop nunca
+# se queda atrás respecto a lo que ya está en producción.
+#
+# Usa el token de la GitHub App (no el GITHUB_TOKEN) para que el PR dispare el check
+# y se pueda auto-mergear. Requiere en el repo: "Allow auto-merge" activado, y que la
+# App pueda mergear en develop (o esté en la lista de bypass de su protección).
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency: sync-main-develop
+
+jobs:
+  sync:
+    name: Sync main → develop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Token de la App
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Crear rama de sync y PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          git fetch origin main develop --quiet
+
+          # ¿Tiene main algún commit que develop no tenga? Si no, nada que sincronizar.
+          if [ "$(git rev-list --count origin/develop..origin/main)" -eq 0 ]; then
+            echo "::notice::develop ya está al día con main; nada que sincronizar."
+            exit 0
+          fi
+
+          ts="$(date +%Y%m%d-%H%M%S)"
+          rama="chore/sync-main-to-develop-${ts}"
+          git switch -c "$rama" origin/main
+          git push origin "$rama"
+
+          gh pr create \
+            --base develop \
+            --head "$rama" \
+            --title "chore: sync main → develop (${ts})" \
+            --body "Sincroniza \`main\` de vuelta a \`develop\` tras la última publicación. Generado automáticamente.
+
+          Si hay conflicto, el auto-merge no se completa y este PR queda para resolverlo a mano."
+
+          # Auto-merge en cuanto pase el check. Si hay conflicto o falla el check, el PR
+          # queda abierto para resolverlo a mano.
+          gh pr merge "$rama" --merge --auto --delete-branch

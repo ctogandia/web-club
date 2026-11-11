@@ -5,7 +5,7 @@ Description: Tema hijo de Kadence para la web del Club de Tiro Olímpico Gandia.
 Author: Club de Tiro Olímpico Gandia
 Author URI: https://ctogandia.com
 Template: kadence
-Version: 0.1.0
+Version: 0.2.0
 Requires at least: 6.5
 Requires PHP: 8.1
 License: GNU General Public License v2 or later
@@ -13,4 +13,20 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: kadence-child
 */
 
-/* Los estilos propios del club van aquí. El CSS de Kadence (padre) se carga aparte. */
+/*
+ * Colores del club (escudo): rojo y oro de la bandera, verde del laurel, gris del castillo.
+ *   Rojo   #c8102e   Oro   #f4c400   Verde  #2e7d32   Gris  #bdbdbd
+ *
+ * Kadence pinta enlaces, botones y acentos con su "paleta global" (--global-palette1 = acento
+ * principal, --global-palette2 = su variante oscura para hover). Remapeamos solo esos dos al
+ * rojo del club, así los acentos siguen el escudo sin tocar textos ni fondos.
+ *
+ * Se define en `body` (no en `:root`) para ganar a la paleta que Kadence imprime en `:root`,
+ * independientemente del orden de carga.
+ */
+body {
+	--global-palette1: #c8102e; /* acento principal: enlaces, botones, resaltados */
+	--global-palette2: #9e0c22; /* rojo oscuro: hover del acento */
+}
+
+/* El resto de personalización del club irá aquí según se vaya diseñando. */
