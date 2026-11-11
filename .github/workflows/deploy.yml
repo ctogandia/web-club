@@ -12,8 +12,6 @@ name: Desplegar
 on:
   push:
     branches: [develop, main, 'release/rc-*']
-  pull_request:
-    branches: [main]
   workflow_dispatch:   # desplegar pruebas a demanda desde la rama que elijas (p. ej. develop)
 
 permissions:
