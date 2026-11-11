@@ -53,7 +53,7 @@ function ctogandia_entorno_aviso() {
 		case 'staging':
 			return array(
 				'etiqueta' => 'WEB DE PRUEBAS',
-				'color'    => '#b45309',
+				'color'    => '#c2691c',
 				'nota'     => 'Los cambios hechos aquí no se publican en ctogandia.com y los correos están desactivados.',
 			);
 		default:
