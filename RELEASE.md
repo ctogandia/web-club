@@ -46,7 +46,9 @@ Esto no está en el repo; se configura en *Settings* del repositorio en GitHub:
 - **Environments → `staging`:** variable `REMOTE_PATH = pruebas`. Secrets `SFTP_HOST`, `SFTP_USER`, `SFTP_PASSWORD`, `SSH_KNOWN_HOSTS`.
 - **Environments → `production`:** variable `REMOTE_PATH = www`. Mismos secrets. **Required reviewers:** tú (es la aprobación antes de publicar).
 - **Branches → regla para `main`:** requiere PR antes de mergear y marca **Comprobar PHP** como check obligatorio.
-- **General → Pull Requests:** deja activado *Allow merge commits*. El tag automático lee el nombre `release/rc-vX.Y.Z` del commit de merge; si mergeas con *squash*, ese nombre se pierde y no se crea el tag (tendrías que tagear a mano).
+- **General → Pull Requests:** deja activado *Allow merge commits* y **Allow auto-merge** (lo usa el sync `main → develop`). El tag automático lee el nombre `release/rc-vX.Y.Z` del commit de merge; si mergeas con *squash*, ese nombre se pierde y no se crea el tag (tendrías que tagear a mano).
+- **GitHub App `ctogandia-ci`:** creada en la organización, con permisos *Contents*, *Pull requests* y *Workflows* (Read & write), instalada en el repo. Sus credenciales están en variables/secrets de **organización**: variable `APP_ID` y secret `APP_PRIVATE_KEY`. Los workflows `crear-release` y `sync-main-develop` mintan un token con ella (`actions/create-github-app-token`) para crear ramas y PRs que **sí** disparan los demás workflows (el `GITHUB_TOKEN` no lo haría).
+- **Regla para `develop`:** para que el sync se auto-mergee, `develop` no debe exigir *reviews* (basta requerir PR + el check **Comprobar PHP**), o bien añade la App `ctogandia-ci` a la lista de *bypass* de su regla de protección.
 
 ## Volver atrás (rollback)
 

@@ -5,7 +5,7 @@ name: Lint
 # a las ramas de trabajo.
 on:
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   push:
     branches: [develop, main, 'release/rc-*']
 
