@@ -1,0 +1,16 @@
+/*
+Theme Name: Kadence Child – CTO Gandia
+Theme URI: https://ctogandia.com
+Description: Tema hijo de Kadence para la web del Club de Tiro Olímpico Gandia. Se despliega desde el repositorio web-club.
+Author: Club de Tiro Olímpico Gandia
+Author URI: https://ctogandia.com
+Template: kadence
+Version: 0.1.0
+Requires at least: 6.5
+Requires PHP: 8.1
+License: GNU General Public License v2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: kadence-child
+*/
+
+/* Los estilos propios del club van aquí. El CSS de Kadence (padre) se carga aparte. */

@@ -79,6 +79,11 @@ Lo mismo vale para `mu-plugins/ctogandia`.
 
 Apunta aquí lo que hay que hacer a mano en producción al publicar cada versión: ajustes del panel, importar un JSON de configuración, activar un plugin…
 
+### v0.2.0
+- **Requiere el tema Kadence (padre) instalado.** Instálalo desde *Apariencia → Temas → Añadir nuevo* (wordpress.org) **antes** de activar el hijo; sin el padre, el tema hijo aparece como roto y no se puede activar.
+- Activa el tema **Kadence Child – CTO Gandia** en *Apariencia → Temas*.
+- Hazlo primero en pruebas y, al publicar, también en producción.
+
 ### v0.1.0
 - Nada. Solo instala los mu-plugins de entorno.
 - Comprobación: en producción **no** debe aparecer el aviso rojo, y en pruebas **sí**.
