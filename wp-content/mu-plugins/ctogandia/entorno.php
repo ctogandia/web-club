@@ -9,7 +9,8 @@
  *       producción = rojo, pruebas = ámbar, local = azul.
  *
  * Fuera de producción (pruebas, local):
- *   - No se envía ningún correo; solo se anota en el log de PHP.
+ *   - No se envían correos (se anotan en el log). Se puede permitir el envío real
+ *     temporalmente (1 hora) con un botón en la barra de administración, para probar SMTP.
  *   - noindex en todas las páginas, robots.txt y cabeceras.
  *
  * El aviso solo cambia colores y textos: NO altera el comportamiento del sitio.
@@ -125,29 +126,118 @@ if ( 'production' === wp_get_environment_type() ) {
 }
 
 /*
- * 1. Correo bloqueado.
+ * 1. Correo bloqueado, con permiso temporal desde la barra de administración.
  *
- * wp_mail() es una función "pluggable": se usa la primera definición que se carga.
- * Los mu-plugins se cargan antes que los plugins, así que esta versión tiene prioridad
- * también sobre FluentSMTP y otros plugins de correo.
+ * Cortamos el envío con el filtro pre_wp_mail en lugar de redefinir wp_mail(). Así
+ * wp_mail() sigue siendo la de WordPress y plugins como FluentSMTP (que necesitan la
+ * wp_mail original) se pueden configurar sin conflicto; el correo simplemente no sale
+ * y se anota en el log.
+ *
+ * Para probar envíos reales (p. ej. FluentSMTP), hay un botón en la barra de admin que
+ * permite el envío durante 1 hora y se apaga solo (se guarda en un transient, así que
+ * es un clic: sin tocar ficheros ni desplegar). "Cortar" lo desactiva al instante. El
+ * filtro consulta el estado en cada envío, así que el cambio es inmediato en ambos
+ * sentidos. También se puede forzar desde wp-config.php con
+ *     define( 'CTOGANDIA_ALLOW_MAIL', true );
+ * (útil en local o CI). Cuidado: pruebas puede tener copias de datos reales de socios.
  */
-if ( ! function_exists( 'wp_mail' ) ) {
-	/**
-	 * Sustituye a wp_mail(): no envía nada y lo anota en el log.
-	 *
-	 * @param string|string[] $to          Destinatarios.
-	 * @param string          $subject     Asunto.
-	 * @param string          $message     Cuerpo (no se usa).
-	 * @param string|string[] $headers     Cabeceras (no se usan).
-	 * @param string|string[] $attachments Adjuntos (no se usan).
-	 * @return bool Siempre true, para que los formularios funcionen igual que en producción.
-	 */
-	function wp_mail( $to, $subject, $message, $headers = '', $attachments = array() ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
-		$to = is_array( $to ) ? implode( ', ', $to ) : $to;
-		error_log( sprintf( '[ctogandia] Correo NO enviado (%s) → %s | %s', wp_get_environment_type(), $to, $subject ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+
+/**
+ * ¿Está permitido el envío de correos ahora mismo en este entorno?
+ *
+ * @return bool
+ */
+function ctogandia_correo_permitido() {
+	if ( defined( 'CTOGANDIA_ALLOW_MAIL' ) && CTOGANDIA_ALLOW_MAIL ) {
 		return true;
 	}
+	return (int) get_transient( 'ctogandia_allow_mail' ) > time();
 }
+
+add_filter(
+	'pre_wp_mail',
+	static function ( $short_circuit, $atts ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
+		if ( ctogandia_correo_permitido() ) {
+			return $short_circuit; // Deja pasar: wp_mail() envía de verdad.
+		}
+		$to = isset( $atts['to'] ) ? $atts['to'] : '';
+		$to = is_array( $to ) ? implode( ', ', $to ) : $to;
+		$subject = isset( $atts['subject'] ) ? $atts['subject'] : '';
+		error_log( sprintf( '[ctogandia] Correo NO enviado (%s) → %s | %s', wp_get_environment_type(), $to, $subject ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		return true; // Corta wp_mail(): no envía y devuelve true, como si hubiera salido.
+	},
+	10,
+	2
+);
+
+/**
+ * Activa (1 hora) o corta al instante el envío de correos. Lo llama el botón de la barra.
+ */
+function ctogandia_correo_toggle() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( 'No tienes permiso para esto.' );
+	}
+	check_admin_referer( 'ctogandia_correo_toggle' );
+
+	if ( ctogandia_correo_permitido() ) {
+		delete_transient( 'ctogandia_allow_mail' );
+	} else {
+		set_transient( 'ctogandia_allow_mail', time() + HOUR_IN_SECONDS, HOUR_IN_SECONDS );
+	}
+
+	wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url() );
+	exit;
+}
+add_action( 'admin_post_ctogandia_correo_toggle', 'ctogandia_correo_toggle' );
+
+/*
+ * Botón en la barra de administración (solo para quien administre): estado + permitir/cortar.
+ */
+add_action(
+	'admin_bar_menu',
+	static function ( $wp_admin_bar ) {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$expira   = (int) get_transient( 'ctogandia_allow_mail' );
+		$activo   = $expira > time();
+		$restante = $activo ? (int) ceil( ( $expira - time() ) / MINUTE_IN_SECONDS ) : 0;
+
+		$titulo = $activo
+			? sprintf( '✉ Correos ON (%d min) · Cortar', $restante )
+			: '✉ Correos OFF · Permitir 1h';
+
+		$wp_admin_bar->add_node(
+			array(
+				'id'    => 'ctogandia-correo',
+				'title' => esc_html( $titulo ),
+				'href'  => wp_nonce_url( admin_url( 'admin-post.php?action=ctogandia_correo_toggle' ), 'ctogandia_correo_toggle' ),
+				'meta'  => array( 'title' => $activo ? 'Pulsa para cortar el envío de correos al instante' : 'Pulsa para permitir el envío real durante 1 hora' ),
+			)
+		);
+	},
+	90
+);
+
+/*
+ * Aviso mientras el envío esté activado, para no dejarlo encendido por olvido.
+ */
+add_action(
+	'admin_notices',
+	static function () {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$expira = (int) get_transient( 'ctogandia_allow_mail' );
+		if ( $expira <= time() ) {
+			return;
+		}
+		printf(
+			'<div class="notice notice-warning"><p><strong>Envío de correos ACTIVADO</strong> en este entorno (%d min restantes). Los correos salen de verdad.</p></div>',
+			(int) ceil( ( $expira - time() ) / MINUTE_IN_SECONDS )
+		);
+	}
+);
 
 /*
  * 2. Sin indexación.
