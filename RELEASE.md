@@ -64,11 +64,60 @@ Lo mismo vale para `mu-plugins/ctogandia`.
 
 ## Refrescar pruebas con datos de producción
 
-1. Exporta la base de datos de producción (`ctogang635`) desde phpMyAdmin o el panel de OVH.
-2. Impórtala en la de pruebas (`ctogangprueba`). Esto **borra** lo que hubiera en pruebas.
-3. En el WordPress de pruebas, usa **Better Search Replace** para cambiar `https://ctogandia.com` por `https://pruebas.ctogandia.com`, con *todas las tablas* marcadas. Hazlo primero en modo simulación.
-4. Copia `www/wp-content/uploads/` a `pruebas/wp-content/uploads/` por SFTP.
-5. Entra en pruebas con tu usuario de producción. La base de datos es la de producción, así que las contraseñas son las de allí. Comprueba que aparece el aviso **WEB DE PRUEBAS**.
+Copia el estado real de producción a pruebas para probar con datos de verdad. **El
+contenido baja (prod → pruebas), nunca al revés.**
+
+### Qué se sobrescribe y qué se mantiene
+
+- **Se sobrescribe (vive en la BD):** todo el contenido (páginas, entradas, menús,
+  medios), los **usuarios y contraseñas** (entrarás con los de prod), los ajustes del
+  sitio (título, email de admin, zona horaria, permalinks, `siteurl`/`home`), el estado
+  activo/inactivo de los plugins y **toda su configuración** (incluidas las credenciales
+  SMTP de FluentSMTP y la licencia de Wordfence), y los ajustes del Personalizador.
+- **Se mantiene (vive en ficheros):** `pruebas/wp-config.php` (`WP_ENVIRONMENT_TYPE`,
+  `DISALLOW_FILE_EDIT`, la BD `ctogangprueba`, las *salts*), los mu-plugins y el tema
+  hijo, y `pruebas/.htaccess` (la contraseña). Por eso el **aviso de pruebas, el noindex
+  y el bloqueo de correo sobreviven** al refresh: están en ficheros, no en la BD.
+- **`uploads/` no viaja con la BD:** hay que copiarlo aparte (paso 5), o las imágenes
+  saldrán rotas.
+
+### Preparación (una sola vez)
+
+- En `pruebas/wp-config.php`, fija las URLs para que pruebas **siempre resuelva a sí
+  mismo**, aunque la BD traiga las de prod (si no, tras importar no podrías ni entrar al
+  panel para arreglarlo):
+  ```php
+  define( 'WP_HOME', 'https://pruebas.ctogandia.com' );
+  define( 'WP_SITEURL', 'https://pruebas.ctogandia.com' );
+  ```
+- Comprueba que el **`$table_prefix`** de `pruebas/wp-config.php` coincide con el de
+  `www/wp-config.php` (normalmente `wp_`). Si no coincide, la importación no encaja:
+  iguala el de pruebas al de prod.
+
+### Cada refresco
+
+1. **Exporta la BD de producción** (`ctogang635`) desde phpMyAdmin (panel de OVH) a un
+   `.sql`. Haz antes una **copia de seguridad de prod con UpdraftPlus** por si acaso.
+2. **Importa en la BD de pruebas** (`ctogangprueba`): en phpMyAdmin, **vacía antes las
+   tablas** de `ctogangprueba` y luego importa el `.sql`. Esto borra lo que hubiera en
+   pruebas.
+3. Entra en `https://pruebas.ctogandia.com/wp-admin` (gracias a `WP_HOME`/`WP_SITEURL`
+   ya puedes, aunque la BD tenga las URLs de prod). Las credenciales ahora son **las de
+   prod**.
+4. **Better Search Replace** (instálalo/actívalo en pruebas): reemplaza
+   `https://ctogandia.com` → `https://pruebas.ctogandia.com`, con *todas las tablas*
+   marcadas. **Primero en modo simulación**, luego en real. Arregla las URLs incrustadas
+   en el contenido y en datos serializados.
+5. **Sincroniza `uploads/`** de prod a pruebas por SFTP:
+   `www/wp-content/uploads/` → `pruebas/wp-content/uploads/` (p. ej. `lftp mirror`).
+6. **Limpieza tras el refresh:**
+   - Reactiva el set de plugins de pruebas. Los que solo van en prod (Wordfence,
+     LightStart, UpdraftPlus, Rank Math, WP Super Cache) WordPress los **desactiva solos**
+     porque sus ficheros no están en pruebas; es normal.
+   - Si Wordfence fuera premium, **quita su licencia** de pruebas (viene en la BD de prod)
+     para no tener dos sitios con la misma key.
+   - Comprueba que aparece el aviso **WEB DE PRUEBAS** (ámbar). Confirma que el `curl` de
+     pruebas sigue con *noindex* y que los correos están bloqueados (botón "Correos OFF").
 
 ## Qué está en este repositorio y qué no
 
